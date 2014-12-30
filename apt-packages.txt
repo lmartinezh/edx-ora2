@@ -13,7 +13,9 @@ libmysqlclient-dev
 libxml2-dev
 libxslt1-dev
 nodejs
+python2.7
 python2.7-dev
 python-mysqldb
+python-pip
 python-software-properties
 rubygems
