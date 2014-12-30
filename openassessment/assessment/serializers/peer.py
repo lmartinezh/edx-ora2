@@ -5,7 +5,7 @@ from rest_framework import serializers
 from .base import AssessmentSerializer
 from openassessment.assessment.models import (
     AssessmentFeedback, AssessmentFeedbackOption,
-    PeerWorkflow, PeerWorkflowCancellation, PeerWorkflowItem
+    PeerWorkflow, PeerWorkflowItem
 )
 
 
@@ -70,18 +70,4 @@ class PeerWorkflowItemSerializer(serializers.ModelSerializer):
             'started_at',
             'assessment',
             'scored'
-        )
-
-
-class PeerWorkflowCancellationSerializer(serializers.ModelSerializer):
-    """
-    Serialize a `PeerWorkflowCancellation` model.
-    """
-
-    class Meta:
-        model = PeerWorkflowCancellation
-        fields = (
-            'comments',
-            'cancelled_by_id',
-            'created_at',
         )

@@ -7,6 +7,7 @@ from openassessment.assessment.api import peer as peer_api
 from openassessment.assessment.errors import (
     PeerAssessmentRequestError, PeerAssessmentInternalError, PeerAssessmentWorkflowError
 )
+from openassessment.workflow import api as workflow_api
 from openassessment.workflow.errors import AssessmentWorkflowError
 from openassessment.xblock.defaults import DEFAULT_RUBRIC_FEEDBACK_TEXT
 from .data_conversion import create_rubric_dict
@@ -214,8 +215,13 @@ class PeerAssessmentMixin(object):
                     "Submit your assessment & move to response #{response_number}"
                 ).format(response_number=(count + 2))
 
-        if peer_api.is_workflow_submission_cancelled(self.submission_uuid):
-            path = 'openassessmentblock/peer/oa_peer_waiting.html'
+        if peer_api.is_workflow_cancelled(self.submission_uuid):
+            workflow_cancellation = workflow_api.get_assessment_workflow_cancellation(self.submission_uuid)
+            if workflow_cancellation:
+                workflow_cancellation['cancelled_by'] = self.get_username(workflow_cancellation['cancelled_by_id'])
+
+            context_dict['workflow_cancellation'] = workflow_cancellation
+            path = 'openassessmentblock/peer/oa_peer_cancelled.html'
             # Sets the XBlock boolean to signal to Message that it WAS able to grab a submission
             self.no_peers = True
 

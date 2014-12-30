@@ -11,12 +11,12 @@ from dogapi import dog_stats_api
 
 from openassessment.assessment.models import (
     Assessment, AssessmentFeedback, AssessmentPart,
-    InvalidRubricSelection, PeerWorkflow, PeerWorkflowItem, PeerWorkflowCancellation
+    InvalidRubricSelection, PeerWorkflow, PeerWorkflowItem
 )
 from openassessment.assessment.serializers import (
     AssessmentFeedbackSerializer, RubricSerializer,
     full_assessment_dict, rubric_from_dict, serialize_assessments,
-    InvalidRubric, PeerWorkflowCancellationSerializer
+    InvalidRubric
 )
 from openassessment.assessment.errors import (
     PeerAssessmentRequestError, PeerAssessmentWorkflowError, PeerAssessmentInternalError
@@ -430,12 +430,12 @@ def get_assessment_median_scores(submission_uuid):
         assessments = [item.assessment for item in items]
         scores = Assessment.scores_by_criterion(assessments)
         score_dict = Assessment.get_median_score_dict(scores)
-
-        # Is it OK way to give zero score to a cancelled submission? Another way could be don't calculate
-        # the score above and just return a fake score dict but this may have side effects?
-        if workflow.is_cancelled:
-            for key in score_dict:
-                score_dict[key] = 0
+        #
+        # # Is it OK way to give zero score to a cancelled submission? Another way could be don't calculate
+        # # the score above and just return a fake score dict but this may have side effects?
+        # if workflow.cancelled_at:
+        #     for key in score_dict:
+        #         score_dict[key] = 0
 
         return score_dict
 
@@ -677,9 +677,6 @@ def get_submission_to_assess(submission_uuid, graded_by):
             u"A Peer Assessment Workflow does not exist for the student "
             u"with submission UUID {}".format(submission_uuid)
         )
-
-    if workflow.is_cancelled:
-        return None
 
     open_item = workflow.find_active_assessments()
     peer_submission_uuid = open_item.submission_uuid if open_item else None
@@ -962,63 +959,7 @@ def _log_workflow(submission_uuid, workflow):
     dog_stats_api.increment('openassessment.assessment.peer_workflow.count', tags=tags)
 
 
-def cancel_submission_peer_workflow(submission_uuid, comments, cancelled_by_id):
-    """
-    Add an entry in PeerWorkflowCancellation table for a PeerWorkflow.
-
-    PeerWorkflow which has been cancelled is no longer included in the
-    peer grading pool.
-
-    Args:
-        submission_uuid (str): The UUID of the peer workflow's submission.
-        comments (str): The reason for cancellation.
-        cancelled_by_id (str): The ID of the user who cancelled the peer workflow.
-    """
-    try:
-        workflow = PeerWorkflow.objects.get(submission_uuid=submission_uuid)
-
-        items = workflow.graded_by.filter(
-            assessment__submission_uuid=submission_uuid, assessment__score_type=PEER_TYPE
-        ).order_by('-assessment')
-
-        if items:
-            sub_api.set_score(
-                submission_uuid,
-                0,
-                items[0].assessment.points_possible
-            )
-
-        return PeerWorkflowCancellation.create(workflow=workflow, comments=comments, cancelled_by_id=cancelled_by_id)
-    except (
-        PeerWorkflow.DoesNotExist,
-        PeerWorkflow.MultipleObjectsReturned,
-    ):
-        error_message = u"Error finding workflow for submission UUID {}.".format(submission_uuid)
-        logger.exception(error_message)
-        raise PeerAssessmentWorkflowError(error_message)
-    except DatabaseError:
-        error_message = u"Error creating peer workflow cancellation for submission UUID {}.".format(submission_uuid)
-        logger.exception(error_message)
-        raise PeerAssessmentInternalError(error_message)
-
-
-def get_submission_cancellation(submission_uuid):
-    """
-    Get cancellation information for a submission's peer workflow.
-
-    Args:
-        submission_uuid (str): The UUID of the peer workflow's submission.
-    """
-    try:
-        workflow_cancellation = PeerWorkflowCancellation.get_latest_workflow_cancellation(submission_uuid=submission_uuid)
-        return PeerWorkflowCancellationSerializer(workflow_cancellation).data if workflow_cancellation else None
-    except DatabaseError:
-        error_message = u"Error finding peer workflow cancellation for submission UUID {}.".format(submission_uuid)
-        logger.exception(error_message)
-        raise PeerAssessmentInternalError(error_message)
-
-
-def is_workflow_submission_cancelled(submission_uuid):
+def is_workflow_cancelled(submission_uuid):
     """
     Check if workflow submission is cancelled?
 
@@ -1035,3 +976,38 @@ def is_workflow_submission_cancelled(submission_uuid):
         return workflow.is_cancelled if workflow else False
     except PeerAssessmentWorkflowError:
         return False
+
+
+def on_cancel(submission_uuid):
+    """Cancels the peer workflow for submission.
+
+    Set the cancelled_at field in peer workflow associated with a
+    submission.
+
+    Args:
+        submission_uuid (str): The submission associated with this workflow.
+
+    Returns:
+        None
+
+    """
+    try:
+        workflow = PeerWorkflow.get_by_submission_uuid(submission_uuid)
+        workflow.cancelled_at = timezone.now()
+        workflow.save()
+    except PeerAssessmentWorkflowError:
+        error_message = (
+            u"An internal error occurred while cancelling the peer"
+            u"workflow for submission {}"
+            .format(submission_uuid)
+        )
+        logger.exception(error_message)
+        raise PeerAssessmentInternalError(error_message)
+    except DatabaseError:
+        error_message = (
+            u"An internal error occurred while cancelling the peer"
+            u"workflow for submission {}"
+            .format(submission_uuid)
+        )
+        logger.exception(error_message)
+        raise PeerAssessmentInternalError(error_message)

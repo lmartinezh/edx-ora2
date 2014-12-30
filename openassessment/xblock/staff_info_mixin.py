@@ -10,7 +10,10 @@ import logging
 from xblock.core import XBlock
 import sys
 from openassessment.assessment.errors import (
-    PeerAssessmentInternalError, PeerAssessmentWorkflowError,
+    PeerAssessmentInternalError,
+)
+from openassessment.workflow.errors import (
+    AssessmentWorkflowError, AssessmentWorkflowInternalError
 )
 from openassessment.assessment.errors.ai import AIError
 from openassessment.xblock.resolve_dates import DISTANT_PAST, DISTANT_FUTURE
@@ -22,6 +25,7 @@ from openassessment.assessment.api import peer as peer_api
 from openassessment.assessment.api import self as self_api
 from openassessment.assessment.api import ai as ai_api
 from openassessment.fileupload import api as file_api
+from openassessment.workflow import api as workflow_api
 
 
 logger = logging.getLogger(__name__)
@@ -274,13 +278,13 @@ class StaffInfoMixin(object):
         if "example-based-assessment" in assessment_steps:
             example_based_assessment = ai_api.get_latest_assessment(submission_uuid)
 
-        submission_cancellation = peer_api.get_submission_cancellation(submission_uuid)
-        if submission_cancellation:
-            submission_cancellation['cancelled_by'] = self.get_username(submission_cancellation['cancelled_by_id'])
+        workflow_cancellation = workflow_api.get_assessment_workflow_cancellation(submission_uuid)
+        if workflow_cancellation:
+            workflow_cancellation['cancelled_by'] = self.get_username(workflow_cancellation['cancelled_by_id'])
 
         context = {
             'submission': submission,
-            'submission_cancellation': submission_cancellation,
+            'workflow_cancellation': workflow_cancellation,
             'peer_assessments': peer_assessments,
             'submitted_assessments': submitted_assessments,
             'self_assessment': self_assessment,
@@ -362,16 +366,20 @@ class StaffInfoMixin(object):
 
         student_item_dict = self.get_student_item_dict()
         try:
-            peer_api.cancel_submission_peer_workflow(
-                submission_uuid=submission_uuid, comments=comments, cancelled_by_id=student_item_dict['student_id']
+            assessment_requirements = self.workflow_requirements()
+            # Cancel the related workflow.
+            workflow_api.cancel_workflow(
+                submission_uuid=submission_uuid, comments=comments,
+                cancelled_by_id=student_item_dict['student_id'],
+                assessment_requirements=assessment_requirements
             )
             return {"success": True, 'msg': self._(u"Student submission was removed from the peer grading pool."
-                                                       u" If you'd like to allow the student to submit a new response,"
-                                                       u" please also reset the student state of the problem from"
-                                                       u" the Instructor Dashboard.")}
+                                                   u" If you'd like to allow the student to submit a new response,"
+                                                   u" please also reset the student state of the problem from"
+                                                   u" the Instructor Dashboard.")}
         except (
-                PeerAssessmentWorkflowError,
-                PeerAssessmentInternalError
+                AssessmentWorkflowError,
+                AssessmentWorkflowInternalError
         ) as ex:
             msg = ex.message
             logger.exception(msg)

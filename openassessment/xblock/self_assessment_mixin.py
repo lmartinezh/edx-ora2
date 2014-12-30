@@ -67,6 +67,16 @@ class SelfAssessmentMixin(object):
         workflow_status = workflow.get('status')
         self_complete = workflow.get('status_details', {}).get('self', {}).get('complete', False)
 
+        if workflow_api.is_workflow_cancelled(self.submission_uuid):
+            workflow_cancellation = workflow_api.get_assessment_workflow_cancellation(self.submission_uuid)
+            if workflow_cancellation:
+                workflow_cancellation['cancelled_by'] = self.get_username(workflow_cancellation['cancelled_by_id'])
+
+            context['workflow_cancellation'] = workflow_cancellation
+            path = 'openassessmentblock/self/oa_self_cancelled.html'
+            # Sets the XBlock boolean to signal to Message that it WAS able to grab a submission
+            self.no_peers = True
+
         if self_complete:
             path = 'openassessmentblock/self/oa_self_complete.html'
         elif workflow_status == 'self' or problem_closed:

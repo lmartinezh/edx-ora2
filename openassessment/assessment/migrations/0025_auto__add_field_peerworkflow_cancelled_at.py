@@ -8,20 +8,15 @@ from django.db import models
 class Migration(SchemaMigration):
 
     def forwards(self, orm):
-        # Adding model 'PeerWorkflowCancellation'
-        db.create_table('assessment_peerworkflowcancellation', (
-            ('id', self.gf('django.db.models.fields.AutoField')(primary_key=True)),
-            ('workflow', self.gf('django.db.models.fields.related.ForeignKey')(related_name='cancellation', to=orm['assessment.PeerWorkflow'])),
-            ('comments', self.gf('django.db.models.fields.TextField')(max_length=10000)),
-            ('cancelled_by_id', self.gf('django.db.models.fields.CharField')(max_length=40, db_index=True)),
-            ('created_at', self.gf('django.db.models.fields.DateTimeField')(default=datetime.datetime.now, db_index=True)),
-        ))
-        db.send_create_signal('assessment', ['PeerWorkflowCancellation'])
+        # Adding field 'PeerWorkflow.cancelled_at'
+        db.add_column('assessment_peerworkflow', 'cancelled_at',
+                      self.gf('django.db.models.fields.DateTimeField')(null=True, db_index=True),
+                      keep_default=False)
 
 
     def backwards(self, orm):
-        # Deleting model 'PeerWorkflowCancellation'
-        db.delete_table('assessment_peerworkflowcancellation')
+        # Deleting field 'PeerWorkflow.cancelled_at'
+        db.delete_column('assessment_peerworkflow', 'cancelled_at')
 
 
     models = {
@@ -121,6 +116,7 @@ class Migration(SchemaMigration):
         },
         'assessment.peerworkflow': {
             'Meta': {'ordering': "['created_at', 'id']", 'object_name': 'PeerWorkflow'},
+            'cancelled_at': ('django.db.models.fields.DateTimeField', [], {'null': 'True', 'db_index': 'True'}),
             'completed_at': ('django.db.models.fields.DateTimeField', [], {'null': 'True', 'db_index': 'True'}),
             'course_id': ('django.db.models.fields.CharField', [], {'max_length': '40', 'db_index': 'True'}),
             'created_at': ('django.db.models.fields.DateTimeField', [], {'default': 'datetime.datetime.now', 'db_index': 'True'}),
@@ -129,14 +125,6 @@ class Migration(SchemaMigration):
             'item_id': ('django.db.models.fields.CharField', [], {'max_length': '128', 'db_index': 'True'}),
             'student_id': ('django.db.models.fields.CharField', [], {'max_length': '40', 'db_index': 'True'}),
             'submission_uuid': ('django.db.models.fields.CharField', [], {'unique': 'True', 'max_length': '128', 'db_index': 'True'})
-        },
-        'assessment.peerworkflowcancellation': {
-            'Meta': {'ordering': "['created_at', 'id']", 'object_name': 'PeerWorkflowCancellation'},
-            'cancelled_by_id': ('django.db.models.fields.CharField', [], {'max_length': '40', 'db_index': 'True'}),
-            'comments': ('django.db.models.fields.TextField', [], {'max_length': '10000'}),
-            'created_at': ('django.db.models.fields.DateTimeField', [], {'default': 'datetime.datetime.now', 'db_index': 'True'}),
-            'id': ('django.db.models.fields.AutoField', [], {'primary_key': 'True'}),
-            'workflow': ('django.db.models.fields.related.ForeignKey', [], {'related_name': "'cancellation'", 'to': "orm['assessment.PeerWorkflow']"})
         },
         'assessment.peerworkflowitem': {
             'Meta': {'ordering': "['started_at', 'id']", 'object_name': 'PeerWorkflowItem'},

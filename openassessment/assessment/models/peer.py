@@ -114,6 +114,7 @@ class PeerWorkflow(models.Model):
     created_at = models.DateTimeField(default=now, db_index=True)
     completed_at = models.DateTimeField(null=True, db_index=True)
     grading_completed_at = models.DateTimeField(null=True, db_index=True)
+    cancelled_at = models.DateTimeField(null=True, db_index=True)
 
     class Meta:
         ordering = ["created_at", "id"]
@@ -127,7 +128,7 @@ class PeerWorkflow(models.Model):
         Returns:
             True/False
         """
-        return self.cancellations.exists()
+        return bool(self.cancelled_at)
 
     @classmethod
     def get_by_submission_uuid(cls, submission_uuid):
@@ -237,7 +238,7 @@ class PeerWorkflow(models.Model):
         completed_sub_uuids = []
         # First, remove all completed items.
         for item in items:
-            if item.assessment is not None or item.author.cancellations.exists():
+            if item.assessment is not None or item.author.is_cancelled:
                 completed_sub_uuids.append(item.submission_uuid)
             else:
                 valid_open_items.append(item)
@@ -285,11 +286,7 @@ class PeerWorkflow(models.Model):
                 "and pw.course_id=%s "
                 "and pw.student_id<>%s "
                 "and pw.grading_completed_at is NULL "
-                "and ("
-                "   select count(pwc.id)"
-                "   from assessment_peerworkflowcancellation pwc"
-                "   where pwc.workflow_id=pw.id"
-                ") = 0 "
+                "and pw.cancelled_at is NULL "
                 "and pw.id not in ("
                 "   select pwi.author_id "
                 "   from assessment_peerworkflowitem pwi "
@@ -342,11 +339,7 @@ class PeerWorkflow(models.Model):
                 "where course_id=%s "
                 "and item_id=%s "
                 "and student_id<>%s "
-                "and ("
-                "   select count(pwc.id)"
-                "   from assessment_peerworkflowcancellation pwc"
-                "   where pwc.workflow_id=pw.id"
-                ") = 0 "
+                "and pw.cancelled_at is NULL "
                 "and pw.id not in ( "
                     "select pwi.author_id "
                     "from assessment_peerworkflowitem pwi "
@@ -483,65 +476,3 @@ class PeerWorkflowItem(models.Model):
 
     def __unicode__(self):
         return repr(self)
-
-
-class PeerWorkflowCancellation(models.Model):
-    """Model for tracking cancellations of peer workflows.
-
-    It is created when a staff member requests removal of a submission
-    from the peer grading pool.
-    """
-    workflow = models.ForeignKey(PeerWorkflow, related_name='cancellations')
-    comments = models.TextField(max_length=10000)
-    cancelled_by_id = models.CharField(max_length=40, db_index=True)
-
-    created_at = models.DateTimeField(default=now, db_index=True)
-
-    class Meta:
-        ordering = ["created_at", "id"]
-        app_label = "assessment"
-
-    def __repr__(self):
-        return (
-            "PeerWorkflowCancellation(workflow={0.workflow}, "
-            "comments={0.comments}, cancelled_by_id={0.cancelled_by_id}, "
-            "created_at={0.created_at})"
-        ).format(self)
-
-    def __unicode__(self):
-        return repr(self)
-
-    @classmethod
-    def create(cls, workflow, comments, cancelled_by_id):
-        """
-        Create a new PeerWorkflowCancellation object.
-
-        Args:
-            workflow (PeerWorkflow): The cancelled peer workflow.
-            comments (unicode): The reason for cancellation.
-            cancelled_by_id (unicode): The ID of the user who cancelled the peer workflow.
-
-        Returns:
-            PeerWorkflowCancellation
-
-        """
-        cancellation_params = {
-            'workflow': workflow,
-            'comments': comments,
-            'cancelled_by_id': cancelled_by_id,
-        }
-        return cls.objects.create(**cancellation_params)
-
-    @classmethod
-    def get_latest_workflow_cancellation(cls, submission_uuid):
-        """
-        Get the latest PeerWorkflowCancellation for a submission's workflow.
-
-        Args:
-            submission_uuid (str): The UUID of the peer workflow's submission.
-
-        Returns:
-            PeerWorkflowCancellation or None
-        """
-        workflow_cancellations = cls.objects.filter(workflow__submission_uuid=submission_uuid).order_by("-created_at")
-        return workflow_cancellations[0] if workflow_cancellations.exists() else None
