@@ -77,7 +77,7 @@ class SelfAssessmentMixin(object):
             # Sets the XBlock boolean to signal to Message that it WAS able to grab a submission
             self.no_peers = True
 
-        if self_complete:
+        elif self_complete:
             path = 'openassessmentblock/self/oa_self_complete.html'
         elif workflow_status == 'self' or problem_closed:
             assessment = self_api.get_assessment(workflow.get("submission_uuid"))
