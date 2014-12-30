@@ -1,26 +1,23 @@
 #!/usr/bin/env bash
 
-wget https://bitbucket.org/pypa/setuptools/raw/bootstrap/ez_setup.py
-python ez_setup.py
-
 cd `dirname $BASH_SOURCE` && cd ..
 
 echo "Installing Python requirements..."
 pip install -r requirements/base.txt
 
-echo "Installing the OpenAssessment XBlock..."
-cat <<EOF | python -
-import pkg_resources
-import sys
-try:
-    pkg_resources.require('ora2')
-except pkg_resources.DistributionNotFound:
-    sys.exit(1)
-EOF
-ORA2_MISSING=$?
-if [[ $ORA2_MISSING -eq 1 ]]; then
-    pip install -q -e .
-    echo "Installed."
-else
-    echo "Already installed."
-fi
+#echo "Installing the OpenAssessment XBlock..."
+#cat <<EOF | python -
+#import pkg_resources
+#import sys
+#try:
+#    pkg_resources.require('ora2')
+#except pkg_resources.DistributionNotFound:
+#    sys.exit(1)
+#EOF
+#ORA2_MISSING=$?
+#if [[ $ORA2_MISSING -eq 1 ]]; then
+#    pip install -q -e .
+#    echo "Installed."
+#else
+#    echo "Already installed."
+#fi
