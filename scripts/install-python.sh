@@ -1,5 +1,8 @@
 #!/usr/bin/env bash
 
+wget https://bitbucket.org/pypa/setuptools/raw/bootstrap/ez_setup.py
+python ez_setup.py
+
 cd `dirname $BASH_SOURCE` && cd ..
 
 echo "Installing Python requirements..."
